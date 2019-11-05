@@ -36,12 +36,6 @@
 
 #include "py/runtime.h"
 
-#ifdef EXPRESS_BOARD
-#define INTERNAL_CIRCUITPY_CONFIG_START_ADDR (0x00040000 - NVMCTRL_ROW_SIZE - CIRCUITPY_INTERNAL_NVM_SIZE)
-#else
-#define INTERNAL_CIRCUITPY_CONFIG_START_ADDR (0x00040000 - 0x010000 - NVMCTRL_ROW_SIZE - CIRCUITPY_INTERNAL_NVM_SIZE)
-#endif
-
 bool gclk_enabled(uint8_t gclk) {
     common_hal_mcu_disable_interrupts();
     // Explicitly do a byte write so the peripheral knows we're just wanting to read the channel
@@ -147,11 +141,11 @@ static void init_clock_source_dfll48m_usb(void) {
     }
     uint32_t fine = 512;
     #ifdef CALIBRATE_CRYSTALLESS
-    // This is stored in an NVM page after the text and data storage but before
+    // Calibration information is stored in an NVM page after the text and data storage but before
     // the optional file system. The first 16 bytes are the identifier for the
     // section.
-    if (strcmp((char*) INTERNAL_CIRCUITPY_CONFIG_START_ADDR, "CIRCUITPYTHON1") == 0) {
-        fine = ((uint16_t *) INTERNAL_CIRCUITPY_CONFIG_START_ADDR)[8];
+    if (strcmp((char*) CIRCUITPY_INTERNAL_CONFIG_START_ADDR, "CIRCUITPYTHON1") == 0) {
+        fine = ((uint16_t *) CIRCUITPY_INTERNAL_CONFIG_START_ADDR)[8];
     }
     #endif
     SYSCTRL->DFLLVAL.reg = SYSCTRL_DFLLVAL_COARSE(coarse) |
@@ -373,8 +367,8 @@ void save_usb_clock_calibration(void) {
     // save the new value if its different enough.
     SYSCTRL->DFLLSYNC.bit.READREQ = 1;
     uint16_t saved_calibration = 0x1ff;
-    if (strcmp((char*) INTERNAL_CIRCUITPY_CONFIG_START_ADDR, "CIRCUITPYTHON1") == 0) {
-        saved_calibration = ((uint16_t *) INTERNAL_CIRCUITPY_CONFIG_START_ADDR)[8];
+    if (strcmp((char*) CIRCUITPY_INTERNAL_CONFIG_START_ADDR, "CIRCUITPYTHON1") == 0) {
+        saved_calibration = ((uint16_t *) CIRCUITPY_INTERNAL_CONFIG_START_ADDR)[8];
     }
     while (SYSCTRL->PCLKSR.bit.DFLLRDY == 0) {
         // TODO(tannewt): Run the mass storage stuff if this takes a while.
@@ -383,7 +377,7 @@ void save_usb_clock_calibration(void) {
     if (abs(current_calibration - saved_calibration) > 10) {
         // Copy the full internal config page to memory.
         uint8_t page_buffer[NVMCTRL_ROW_SIZE];
-        memcpy(page_buffer, (uint8_t*) INTERNAL_CIRCUITPY_CONFIG_START_ADDR, NVMCTRL_ROW_SIZE);
+        memcpy(page_buffer, (uint8_t*) CIRCUITPY_INTERNAL_CONFIG_START_ADDR, NVMCTRL_ROW_SIZE);
 
         // Modify it.
         memcpy(page_buffer, "CIRCUITPYTHON1", 15);
@@ -396,7 +390,7 @@ void save_usb_clock_calibration(void) {
         // whenever we need it instead of storing it long term.
         struct flash_descriptor desc;
         desc.dev.hw = NVMCTRL;
-        flash_write(&desc, (uint32_t) INTERNAL_CIRCUITPY_CONFIG_START_ADDR, page_buffer, NVMCTRL_ROW_SIZE);
+        flash_write(&desc, (uint32_t) CIRCUITPY_INTERNAL_CONFIG_START_ADDR, page_buffer, NVMCTRL_ROW_SIZE);
     }
 }
 
